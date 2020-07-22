@@ -52,7 +52,7 @@ int main(/* int argc, char *argv[] */) {
 }
 `)
 
-	ci := parseInsertCode("insert_code(" + codeFilePath + ":1-4)")
+	ci := parseInsertCode("insert_code("+codeFilePath+":1-4)", "")
 
 	renderedCode := ci.renderCodeBlock()
 	t.Log(ci.renderCodeBlock())

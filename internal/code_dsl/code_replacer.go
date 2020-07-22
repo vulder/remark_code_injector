@@ -29,9 +29,9 @@ func ContainsDSLCommand(line string) bool {
 
 // Transforms a line by replacing the DSL specific part with the generated
 // content.
-func TransformLine(line string) string {
+func TransformLine(line string, codeRoot string) string {
 	if isInsertCode(line) {
-		return handleInsertCode(line)
+		return handleInsertCode(line, codeRoot)
 	}
 	log.Fatal("Transform was called without a transformable line.")
 	return line
@@ -53,8 +53,8 @@ func isInsertCode(line string) bool {
 	return strings.HasPrefix(line, "insert_code")
 }
 
-func handleInsertCode(line string) string {
-	ci := parseInsertCode(line)
+func handleInsertCode(line string, codeRoot string) string {
+	ci := parseInsertCode(line, codeRoot)
 
 	code_language_type := ci.progLang
 

@@ -9,7 +9,7 @@ import (
 
 // Generates a new version of the HTML document, replacing all DSL annotations
 // with the generated content.
-func ProcessHTMLDocument(inputFilepath string, outputFilepath string) {
+func ProcessHTMLDocument(inputFilepath string, outputFilepath string, codeRoot string) {
 	file, err := os.Open(inputFilepath)
 	if err != nil {
 		log.Fatal("Could not open HTML document: ", err)
@@ -25,7 +25,7 @@ func ProcessHTMLDocument(inputFilepath string, outputFilepath string) {
 	scanner := bufio.NewScanner(file)
 	sep := ""
 	for scanner.Scan() {
-		outputFile.WriteString(sep + handleHTMLLine(scanner.Text()))
+		outputFile.WriteString(sep + handleHTMLLine(scanner.Text(), codeRoot))
 		sep = "\n"
 	}
 	if err := scanner.Err(); err != nil {
@@ -33,9 +33,9 @@ func ProcessHTMLDocument(inputFilepath string, outputFilepath string) {
 	}
 }
 
-func handleHTMLLine(line string) string {
+func handleHTMLLine(line string, codeRoot string) string {
 	if code_dsl.ContainsDSLCommand(line) {
-		return code_dsl.TransformLine(line)
+		return code_dsl.TransformLine(line, codeRoot)
 	}
 	return line
 }

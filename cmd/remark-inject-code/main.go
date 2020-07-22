@@ -9,6 +9,7 @@ import (
 func main() {
 	inputFilepathPtr := flag.String("in", "index_raw.html", "Input file")
 	outputFilepathPtr := flag.String("out", "nil", "Output file")
+	codeRoot := flag.String("code-root", "", "Root folder where code files are stored.")
 
 	flag.Parse()
 	outputFilepath := *outputFilepathPtr
@@ -18,7 +19,7 @@ func main() {
 		outputFilepath = getDefaultOutputFile(*inputFilepathPtr)
 	}
 
-	html_processor.ProcessHTMLDocument(*inputFilepathPtr, outputFilepath)
+	html_processor.ProcessHTMLDocument(*inputFilepathPtr, outputFilepath, *codeRoot)
 }
 
 func getDefaultOutputFile(inputFile string) string {

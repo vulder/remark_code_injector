@@ -48,7 +48,7 @@ func (ci CodeInsertion) renderCodeBlock() string {
 
 var insertCodeRgx = regexp.MustCompile("insert_code\\((?P<filename>.*):(?P<filerange>.*).*\\).*")
 
-func parseInsertCode(line string) CodeInsertion {
+func parseInsertCode(line string, codeRoot string) CodeInsertion {
 	match := insertCodeRgx.FindStringSubmatch(line)
 	matchResults := make(map[string]string)
 	for i, name := range insertCodeRgx.SubexpNames() {
@@ -69,7 +69,7 @@ func parseInsertCode(line string) CodeInsertion {
 	}
 
 	ci := CodeInsertion{}
-	ci.codeBlock = parseCodeBlock(filename, int(start), int(end))
+	ci.codeBlock = parseCodeBlock(codeRoot+filename, int(start), int(end))
 	ci.progLang = getProgrammingLanguage(filename)
 	ci.visuals.Init()
 	ci.highlights.Init()
