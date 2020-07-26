@@ -2,9 +2,10 @@ package html_processor
 
 import (
 	"bufio"
-	"github.com/vulder/remark_code_injector/internal/code_dsl"
 	"log"
 	"os"
+
+	"github.com/vulder/remark_code_injector/internal/code_dsl"
 )
 
 // Generates a new version of the HTML document, replacing all DSL annotations
@@ -31,6 +32,28 @@ func ProcessHTMLDocument(inputFilepath string, outputFilepath string, codeRoot s
 	if err := scanner.Err(); err != nil {
 		log.Fatal("Could not scan HTML docuemnt: ", err)
 	}
+}
+
+// Computes a ';' separated string of all files used in DSL commands.
+func FindDependencies(filepath string) string {
+	file, err := os.Open(filepath)
+	if err != nil {
+		log.Fatal("Could not open HTML document: ", err)
+	}
+	defer file.Close()
+
+	dependencies := ""
+	scanner := bufio.NewScanner(file)
+	sep := ""
+	for scanner.Scan() {
+		dep := code_dsl.GetFileDependency(scanner.Text())
+		if dep != "" {
+			dependencies += sep + dep
+			sep = ";"
+		}
+	}
+
+	return dependencies
 }
 
 func handleHTMLLine(line string, codeRoot string) string {

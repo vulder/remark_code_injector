@@ -42,13 +42,18 @@ type CodeInsertion struct {
 	highlights list.List
 }
 
+type insertCodeInfo struct {
+	filename  string
+	filerange LineRange
+}
+
 func (ci CodeInsertion) renderCodeBlock() string {
 	return ci.codeBlock.render()
 }
 
 var insertCodeRgx = regexp.MustCompile("insert_code\\((?P<filename>.*):(?P<filerange>.*).*\\).*")
 
-func parseInsertCode(line string, codeRoot string) CodeInsertion {
+func parserInsertCodeInfo(line string) insertCodeInfo {
 	match := insertCodeRgx.FindStringSubmatch(line)
 	matchResults := make(map[string]string)
 	for i, name := range insertCodeRgx.SubexpNames() {
@@ -68,9 +73,15 @@ func parseInsertCode(line string, codeRoot string) CodeInsertion {
 		log.Fatal("Could not parse end of the file Range", err)
 	}
 
+	return insertCodeInfo{filename, LineRange{int(start), int(end)}}
+}
+
+func parseInsertCode(line string, codeRoot string) CodeInsertion {
+	ic_info := parserInsertCodeInfo(line)
+
 	ci := CodeInsertion{}
-	ci.codeBlock = parseCodeBlock(codeRoot+filename, int(start), int(end))
-	ci.progLang = getProgrammingLanguage(filename)
+	ci.codeBlock = parseCodeBlock(codeRoot+ic_info.filename, ic_info.filerange.start, ic_info.filerange.end)
+	ci.progLang = getProgrammingLanguage(ic_info.filename)
 	ci.visuals.Init()
 	ci.highlights.Init()
 	return ci
