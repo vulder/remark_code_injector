@@ -28,7 +28,7 @@ int main(/* int argc, char *argv[] */) {
 		t.Error("CodeBlock ends at the wrong line.")
 	}
 
-	renderedCode := cb.render()
+	renderedCode := cb.render(nil)
 
 	if renderedCode != `T shaveTheYak(T t) {
   return t;
@@ -64,6 +64,37 @@ T shaveTheYak(T t) {
 ` {
 		t.Log("renderedCode: ", renderedCode)
 		t.Error("Code was wrongly generated for `insert_code`.")
+	}
+}
+
+func TestRenderHighlights(t *testing.T) {
+	defer filet.CleanUp(t)
+	codeFilePath := filet.TmpDir(t, "") + "/foo.cpp"
+	filet.File(t, codeFilePath, `template <typename T>
+T shaveTheYak(T t) {
+  return t;
+}
+
+int main(/* int argc, char *argv[] */) {
+  return shaveTheYak(42);
+}
+`)
+	dsl_string := "insert_code(" + codeFilePath + ":1-4){4,1-2}"
+
+	ci := parseInsertCode(dsl_string, "")
+	ci.highlights.Init()
+
+	parseHighlights(dsl_string, &ci.highlights)
+
+	renderedCode := ci.renderCodeBlock()
+
+	if renderedCode != `*template <typename T>
+*T shaveTheYak(T t) {
+  return t;
+*}
+` {
+		t.Log("renderedCode: ", renderedCode)
+		t.Error("Code was wrongly generated for `insert_code` with highlights.")
 	}
 }
 
