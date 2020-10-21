@@ -9,6 +9,7 @@ import (
 
 func main() {
 	filepathPtr := flag.String("file", "", "Path to HTML document")
+	codeRoot := flag.String("code-root", "", "Root folder where code files are stored.")
 
 	flag.Parse()
 
@@ -16,5 +17,5 @@ func main() {
 		log.Fatal("User did not provide a filepath to check.")
 	}
 
-	fmt.Print(html_processor.FindDependencies(*filepathPtr))
+	fmt.Print(html_processor.FindDependencies(*filepathPtr, *codeRoot))
 }

@@ -11,17 +11,21 @@ import (
 // line_num      = { digit };
 // range         = { digit }, "-", { digit };
 // ln_range_list = range | line_num, [ { "," , range | line_num } ];
-// vis_select    = "<", ln_range_list , ">";
-// hl_select     = "{" , ln_range_list , "}";
+// vis_select    = "r", "<", ln_range_list , ">";
+// hl_select     = "r", "{" , ln_range_list , "}";
 //
 //===----------------------------------------------------------------------===//
 // Commands:
 //  * "insert_code(filename:" , range | line_num , ")" , vis_select , hl_select
+//  * "rev_insert_code(filename:BlockID)" , vis_select , hl_select
 //===----------------------------------------------------------------------===//
 
 // Checks if the line contains an code DSL command.
 func ContainsDSLCommand(line string) bool {
 	if isInsertCode(line) {
+		return true
+	}
+	if isRevInsertCode(line) {
 		return true
 	}
 	return false
@@ -32,6 +36,9 @@ func ContainsDSLCommand(line string) bool {
 func TransformLine(line string, codeRoot string) string {
 	if isInsertCode(line) {
 		return handleInsertCode(line, codeRoot)
+	}
+	if isRevInsertCode(line) {
+		return handleRevInsertCode(line, codeRoot)
 	}
 	log.Fatal("Transform was called without a transformable line.")
 	return line
@@ -59,4 +66,24 @@ func handleInsertCode(line string, codeRoot string) string {
 	code_language_type := ci.progLang
 
 	return wrapWithCodeBlock(ci.renderCodeBlock(), code_language_type)
+}
+
+//===----------------------------------------------------------------------===//
+// rev_insert_code
+//
+// Examples usage:
+//   rev_insert_code(filename.cpp:ExampleID)<4-8,17>{5-6,8}
+
+func isRevInsertCode(line string) bool {
+	return strings.HasPrefix(line, "rev_insert_code")
+}
+
+func handleRevInsertCode(line string, codeRoot string) string {
+	ci, err := parseRevInsertCode(line, codeRoot)
+	if err != nil { // In the error case we return the unprocessed line to not destroy the doc.
+		print("Could not process rev_insert_code line: ", line)
+		return line
+	}
+
+	return wrapWithCodeBlock(ci.renderCodeBlock(), ci.progLang)
 }

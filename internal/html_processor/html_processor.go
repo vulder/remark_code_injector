@@ -35,7 +35,7 @@ func ProcessHTMLDocument(inputFilepath string, outputFilepath string, codeRoot s
 }
 
 // Computes a ';' separated string of all files used in DSL commands.
-func FindDependencies(filepath string) string {
+func FindDependencies(filepath string, codeRoot string) string {
 	file, err := os.Open(filepath)
 	if err != nil {
 		log.Fatal("Could not open HTML document: ", err)
@@ -46,7 +46,7 @@ func FindDependencies(filepath string) string {
 	scanner := bufio.NewScanner(file)
 	sep := ""
 	for scanner.Scan() {
-		dep := code_dsl.GetFileDependency(scanner.Text())
+		dep := code_dsl.GetFileDependency(scanner.Text(), codeRoot)
 		if dep != "" {
 			dependencies += sep + dep
 			sep = ";"

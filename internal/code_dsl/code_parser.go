@@ -3,6 +3,7 @@ package code_dsl
 import (
 	"bufio"
 	"container/list"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -98,13 +99,13 @@ type CodeInsertion struct {
 	highlights Highlights
 }
 
+func (ci CodeInsertion) renderCodeBlock() string {
+	return ci.codeBlock.render(&ci.highlights)
+}
+
 type insertCodeInfo struct {
 	filename  string
 	filerange LineRange
-}
-
-func (ci CodeInsertion) renderCodeBlock() string {
-	return ci.codeBlock.render(&ci.highlights)
 }
 
 var insertCodeRgx = regexp.MustCompile("insert_code\\((?P<filename>.*):(?P<filerange>.*).*\\).*")
@@ -132,9 +133,66 @@ func parserInsertCodeInfo(line string) insertCodeInfo {
 	return insertCodeInfo{filename, LineRange{int(start), int(end)}}
 }
 
-var highlightCodeRgx = regexp.MustCompile("insert_code\\(.*\\)?[\\<.\\>]*\\{(?P<highlights>.*)\\}")
+var codeBlockRgx = regexp.MustCompile(".*code_block\\((?P<BlockID>.*):(?P<filerange>.*)\\).*")
 
-func parseHighlights(line string, highlights *Highlights) {
+func parseCodeBlockLineRangeFromFile(filepath string, blockID string) (LineRange, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		log.Fatal("Could not open Source File: ", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		match := codeBlockRgx.FindStringSubmatch(line)
+		if match != nil {
+			matchResults := make(map[string]string)
+			for i, name := range insertCodeRgx.SubexpNames() {
+				if i != 0 && name != "" {
+					matchResults[name] = match[i]
+				}
+			}
+			if matchResults["BlockID"] == blockID {
+				filerange := strings.Split(matchResults["filerange"], "-")
+				start, err := strconv.ParseInt(filerange[0], 10, 32)
+				if err != nil {
+					log.Fatal("Could not parse start of the file Range", err)
+				}
+				end, err := strconv.ParseInt(filerange[1], 10, 32)
+				if err != nil {
+					log.Fatal("Could not parse end of the file Range", err)
+				}
+				return LineRange{int(start), int(end)}, nil
+			}
+		}
+	}
+
+	return LineRange{0, 0}, errors.New("No valid BlockID found in file.")
+}
+
+var revInsertCodeRgx = regexp.MustCompile("rev_insert_code\\((?P<filename>.*):(?P<BlockID>.*).*\\).*")
+
+func parseRevInsertCodeInfo(line string, codeRoot string) (insertCodeInfo, error) {
+	match := insertCodeRgx.FindStringSubmatch(line)
+	if match == nil {
+		panic("Line did not contain correct rev_insert_code pattern.")
+	}
+	matchResults := make(map[string]string)
+	for i, name := range insertCodeRgx.SubexpNames() {
+		if i != 0 && name != "" {
+			matchResults[name] = match[i]
+		}
+	}
+
+	filename := matchResults["filename"]
+	lineRange, err := parseCodeBlockLineRangeFromFile(codeRoot+filename, matchResults["BlockID"])
+	return insertCodeInfo{filename, lineRange}, err
+}
+
+var highlightCodeRgx = regexp.MustCompile("insert_code\\(.*\\).*?(?P<rel>[r\\{]+)(?P<highlights>.*)\\}")
+
+func parseHighlights(line string, highlights *Highlights, baseCodeRange *LineRange) {
 	match := highlightCodeRgx.FindStringSubmatch(line)
 	if match == nil { // Return when we did not find any highlights
 		return
@@ -145,6 +203,8 @@ func parseHighlights(line string, highlights *Highlights) {
 			matchResults[name] = match[i]
 		}
 	}
+
+	handleLinesRelative := matchResults["rel"] == "r{"
 
 	blocks := strings.Split(matchResults["highlights"], ",")
 	for _, block := range blocks {
@@ -158,11 +218,20 @@ func parseHighlights(line string, highlights *Highlights) {
 			if err != nil {
 				log.Fatal("Could not parse end of the highlight Range", err)
 			}
+			if handleLinesRelative {
+				// -1 is relevant because line numbers start a 1 not 0
+				start = int64(baseCodeRange.start) + start - 1
+				end = int64(baseCodeRange.start) + end - 1
+			}
 			highlights.PushBack(LineRange{int(start), int(end)})
 		} else { // Handle single line number
 			line_num, err := strconv.ParseInt(block, 10, 32)
 			if err != nil {
 				log.Fatal("Could not parse highlight line number", err)
+			}
+			if handleLinesRelative {
+				// -1 is relevant because line numbers start a 1 not 0
+				line_num = int64(baseCodeRange.start) + line_num - 1
 			}
 			highlights.PushBack(LineNumber{int(line_num)})
 		}
@@ -177,8 +246,23 @@ func parseInsertCode(line string, codeRoot string) CodeInsertion {
 	ci.progLang = getProgrammingLanguage(ic_info.filename)
 	ci.visuals.Init()
 	ci.highlights.Init()
-	parseHighlights(line, &ci.highlights)
+	parseHighlights(line, &ci.highlights, &ic_info.filerange)
 	return ci
+}
+
+func parseRevInsertCode(line string, codeRoot string) (CodeInsertion, error) {
+	ic_info, err := parseRevInsertCodeInfo(line, codeRoot)
+	if err != nil {
+		return CodeInsertion{}, err
+	}
+
+	ci := CodeInsertion{}
+	ci.codeBlock = parseCodeBlock(codeRoot+ic_info.filename, ic_info.filerange.start, ic_info.filerange.end)
+	ci.progLang = getProgrammingLanguage(ic_info.filename)
+	ci.visuals.Init()
+	ci.highlights.Init()
+	parseHighlights(line, &ci.highlights, &ic_info.filerange)
+	return ci, err
 }
 
 func parseCodeBlock(filepath string, start int, end int) CodeBlock {
