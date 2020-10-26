@@ -163,6 +163,38 @@ T shaveTheYak(T t) {
 	}
 }
 
+func TestParseRevInsertCodeTwoIDs(t *testing.T) {
+	defer filet.CleanUp(t)
+	codeFilePath := filet.TmpDir(t, "") + "/foo.cpp"
+	filet.File(t, codeFilePath, `// code_block(BarID:2-3)
+void barFunc {
+}
+
+// code_block(FooID:6-9)
+template <typename T>
+T shaveTheYak(T t) {
+  return t;
+}
+
+int main(/* int argc, char *argv[] */) {
+  return shaveTheYak(42);
+}
+`)
+
+	ci, err := parseRevInsertCode("rev_insert_code("+codeFilePath+":FooID)", "")
+
+	renderedCode := ci.renderCodeBlock()
+
+	if renderedCode != `template <typename T>
+T shaveTheYak(T t) {
+  return t;
+}
+` || err != nil {
+		t.Log("renderedCode: ", renderedCode)
+		t.Error("Code was wrongly generated for `insert_code`.")
+	}
+}
+
 func TestMissingParseRevInsertCode(t *testing.T) {
 	defer filet.CleanUp(t)
 	codeFilePath := filet.TmpDir(t, "") + "/foo.cpp"

@@ -148,7 +148,7 @@ func parseCodeBlockLineRangeFromFile(filepath string, blockID string) (LineRange
 		match := codeBlockRgx.FindStringSubmatch(line)
 		if match != nil {
 			matchResults := make(map[string]string)
-			for i, name := range insertCodeRgx.SubexpNames() {
+			for i, name := range codeBlockRgx.SubexpNames() {
 				if i != 0 && name != "" {
 					matchResults[name] = match[i]
 				}
@@ -171,15 +171,15 @@ func parseCodeBlockLineRangeFromFile(filepath string, blockID string) (LineRange
 	return LineRange{0, 0}, errors.New("No valid BlockID found in file.")
 }
 
-var revInsertCodeRgx = regexp.MustCompile("rev_insert_code\\((?P<filename>.*):(?P<BlockID>.*).*\\).*")
+var revInsertCodeRgx = regexp.MustCompile("rev_insert_code\\((?P<filename>.*):(?P<BlockID>.*)\\).*")
 
 func parseRevInsertCodeInfo(line string, codeRoot string) (insertCodeInfo, error) {
-	match := insertCodeRgx.FindStringSubmatch(line)
+	match := revInsertCodeRgx.FindStringSubmatch(line)
 	if match == nil {
 		panic("Line did not contain correct rev_insert_code pattern.")
 	}
 	matchResults := make(map[string]string)
-	for i, name := range insertCodeRgx.SubexpNames() {
+	for i, name := range revInsertCodeRgx.SubexpNames() {
 		if i != 0 && name != "" {
 			matchResults[name] = match[i]
 		}
