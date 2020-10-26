@@ -43,10 +43,13 @@ func (cb CodeBlock) render(highlights *Highlights) string {
 
 	line_num := cb.fileRange.start
 	for e := cb.lines.Front(); e != nil; e = e.Next() {
+		line := e.Value.(string)
+
 		if highlights != nil && highlights.Contains(line_num) {
 			strRepr += "*"
+			line = strings.TrimPrefix(line, " ")
 		}
-		strRepr += e.Value.(string) + "\n"
+		strRepr += line + "\n"
 
 		line_num++
 	}

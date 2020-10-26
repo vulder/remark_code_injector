@@ -124,7 +124,7 @@ int main(/* int argc, char *argv[] */) {
 
 	if renderedCode != `template <typename T>
 *T shaveTheYak(T t) {
-*  return t;
+* return t;
 }
 ` {
 		t.Log("renderedCode: ", renderedCode)
