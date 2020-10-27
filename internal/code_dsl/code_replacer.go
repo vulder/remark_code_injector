@@ -63,9 +63,9 @@ func isInsertCode(line string) bool {
 func handleInsertCode(line string, codeRoot string) string {
 	ci := parseInsertCode(line, codeRoot)
 
-	code_language_type := ci.progLang
+	codeLanguageType := ci.progLang
 
-	return wrapWithCodeBlock(ci.renderCodeBlock(), code_language_type)
+	return wrapWithCodeBlock(ci.renderCodeBlock(), codeLanguageType)
 }
 
 //===----------------------------------------------------------------------===//

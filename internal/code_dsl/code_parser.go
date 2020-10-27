@@ -231,43 +231,43 @@ func parseHighlights(line string, highlights *Highlights, baseCodeRange *LineRan
 			}
 			highlights.PushBack(LineRange{int(start), int(end)})
 		} else { // Handle single line number
-			line_num, err := strconv.ParseInt(block, 10, 32)
+			lineNum, err := strconv.ParseInt(block, 10, 32)
 			if err != nil {
 				log.Fatal("Could not parse highlight line number", err)
 			}
 			if handleLinesRelative {
 				// -1 is relevant because line numbers start a 1 not 0
-				line_num = int64(baseCodeRange.start) + line_num - 1
+				lineNum = int64(baseCodeRange.start) + lineNum - 1
 			}
-			highlights.PushBack(LineNumber{int(line_num)})
+			highlights.PushBack(LineNumber{int(lineNum)})
 		}
 	}
 }
 
 func parseInsertCode(line string, codeRoot string) CodeInsertion {
-	ic_info := parserInsertCodeInfo(line)
+	icInfo := parserInsertCodeInfo(line)
 
 	ci := CodeInsertion{}
-	ci.codeBlock = parseCodeBlock(codeRoot+ic_info.filename, ic_info.filerange.start, ic_info.filerange.end)
-	ci.progLang = getProgrammingLanguage(ic_info.filename)
+	ci.codeBlock = parseCodeBlock(codeRoot+icInfo.filename, icInfo.filerange.start, icInfo.filerange.end)
+	ci.progLang = getProgrammingLanguage(icInfo.filename)
 	ci.visuals.Init()
 	ci.highlights.Init()
-	parseHighlights(line, &ci.highlights, &ic_info.filerange)
+	parseHighlights(line, &ci.highlights, &icInfo.filerange)
 	return ci
 }
 
 func parseRevInsertCode(line string, codeRoot string) (CodeInsertion, error) {
-	ic_info, err := parseRevInsertCodeInfo(line, codeRoot)
+	icInfo, err := parseRevInsertCodeInfo(line, codeRoot)
 	if err != nil {
 		return CodeInsertion{}, err
 	}
 
 	ci := CodeInsertion{}
-	ci.codeBlock = parseCodeBlock(codeRoot+ic_info.filename, ic_info.filerange.start, ic_info.filerange.end)
-	ci.progLang = getProgrammingLanguage(ic_info.filename)
+	ci.codeBlock = parseCodeBlock(codeRoot+icInfo.filename, icInfo.filerange.start, icInfo.filerange.end)
+	ci.progLang = getProgrammingLanguage(icInfo.filename)
 	ci.visuals.Init()
 	ci.highlights.Init()
-	parseHighlights(line, &ci.highlights, &ic_info.filerange)
+	parseHighlights(line, &ci.highlights, &icInfo.filerange)
 	return ci, err
 }
 
