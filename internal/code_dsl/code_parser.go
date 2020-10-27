@@ -146,6 +146,7 @@ func parseCodeBlockLineRangeFromFile(filepath string, blockID string) (LineRange
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	lineNumber := 1
 	for scanner.Scan() {
 		line := scanner.Text()
 		match := codeBlockRgx.FindStringSubmatch(line)
@@ -166,9 +167,11 @@ func parseCodeBlockLineRangeFromFile(filepath string, blockID string) (LineRange
 				if err != nil {
 					log.Fatal("Could not parse end of the file Range", err)
 				}
-				return LineRange{int(start), int(end)}, nil
+				return LineRange{lineNumber + int(start), lineNumber + int(end)}, nil
 			}
 		}
+
+		lineNumber++
 	}
 
 	return LineRange{0, 0}, errors.New("No valid BlockID found in file.")

@@ -138,7 +138,7 @@ int main(/* int argc, char *argv[] */) {
 func TestParseRevInsertCode(t *testing.T) {
 	defer filet.CleanUp(t)
 	codeFilePath := filet.TmpDir(t, "") + "/foo.cpp"
-	filet.File(t, codeFilePath, `// code_block(FooID:2-5)
+	filet.File(t, codeFilePath, `// code_block(FooID:1-4)
 template <typename T>
 T shaveTheYak(T t) {
   return t;
@@ -166,11 +166,11 @@ T shaveTheYak(T t) {
 func TestParseRevInsertCodeTwoIDs(t *testing.T) {
 	defer filet.CleanUp(t)
 	codeFilePath := filet.TmpDir(t, "") + "/foo.cpp"
-	filet.File(t, codeFilePath, `// code_block(BarID:2-3)
+	filet.File(t, codeFilePath, `// code_block(BarID:1-2)
 void barFunc {
 }
 
-// code_block(FooID:6-9)
+// code_block(FooID:1-4)
 template <typename T>
 T shaveTheYak(T t) {
   return t;
