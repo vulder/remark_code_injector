@@ -8,11 +8,13 @@ import (
 //===----------------------------------------------------------------------===//
 // DSL
 //
-// line_num      = { digit };
-// range         = { digit }, "-", { digit };
-// ln_range_list = range | line_num, [ { "," , range | line_num } ];
-// vis_select    = "r", "<", ln_range_list , ">";
-// hl_select     = "r", "{" , ln_range_list , "}";
+// line_num         = { digit };
+// range            = { digit }, "-", { digit };
+// char_range       = { digit }, "|", { digit };
+// char_range_list  = char_range | [ { "," , char_range } ];
+// ln_range_list    = range | line_num, [ { "," , range | line_num } ];
+// vis_select       = "r", "<", ln_range_list , ">";
+// hl_select        = "r", "{" , ln_range_list , "}";
 //
 //===----------------------------------------------------------------------===//
 // Commands:

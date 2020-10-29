@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -18,8 +19,8 @@ type LineNumber struct {
 }
 
 // Checks if a line number is contained in this line number, i.e., is the same.
-func (ln LineNumber) Contains(line_num int) bool {
-	return ln.value == line_num
+func (ln LineNumber) Contains(lineNum int) bool {
+	return ln.value == lineNum
 }
 
 type LineRange struct {
@@ -28,8 +29,18 @@ type LineRange struct {
 }
 
 // Checks if a line number is contained in this line range.
-func (lr LineRange) Contains(line_num int) bool {
-	return line_num >= lr.start && line_num <= lr.end
+func (lr LineRange) Contains(lineNum int) bool {
+	return lineNum >= lr.start && lineNum <= lr.end
+}
+
+type CharRange struct {
+	lineNum LineNumber
+	start   int
+	end     int
+}
+
+func (cr CharRange) Contains(lineNum int) bool {
+	return lineNum >= cr.lineNum.value && lineNum <= cr.lineNum.value
 }
 
 type CodeBlock struct {
@@ -41,17 +52,21 @@ type CodeBlock struct {
 func (cb CodeBlock) render(highlights *Highlights) string {
 	strRepr := ""
 
-	line_num := cb.fileRange.start
+	lineNum := cb.fileRange.start
 	for e := cb.lines.Front(); e != nil; e = e.Next() {
 		line := e.Value.(string)
 
-		if highlights != nil && highlights.Contains(line_num) {
-			strRepr += "*"
-			line = strings.TrimPrefix(line, " ")
+		if highlights != nil && highlights.Contains(lineNum) {
+			if highlights.HasSubrange(lineNum) {
+				line = highlights.RenderSubrange(line, lineNum)
+			} else {
+				strRepr += "*"
+				line = strings.TrimPrefix(line, " ")
+			}
 		}
 		strRepr += line + "\n"
 
-		line_num++
+		lineNum++
 	}
 
 	return strRepr
@@ -74,6 +89,10 @@ func (hl *Highlights) PushBack(v interface{}) *list.Element {
 func (hl *Highlights) Contains(line_num int) bool {
 	for e := hl.highlightBlocks.Front(); e != nil; e = e.Next() {
 		switch v := e.Value.(type) {
+		case CharRange:
+			if v.Contains(line_num) {
+				return true
+			}
 		case LineNumber:
 			if v.Contains(line_num) {
 				return true
@@ -88,6 +107,72 @@ func (hl *Highlights) Contains(line_num int) bool {
 	}
 
 	return false
+}
+
+// TODO: refactor to own util file
+func insertAt(baseStr string, pos int, text string) string {
+	updatedString := ""
+	if pos <= len(baseStr) {
+		updatedString += baseStr[:pos]
+	} else {
+		updatedString += baseStr
+	}
+
+	updatedString += text
+
+	if pos <= len(baseStr) {
+		updatedString += baseStr[pos:]
+	}
+	return updatedString
+}
+
+func (hl *Highlights) HasSubrange(lineNum int) bool {
+	for e := hl.highlightBlocks.Front(); e != nil; e = e.Next() {
+		switch v := e.Value.(type) {
+		case CharRange:
+			if v.Contains(lineNum) {
+				return true
+			}
+		case LineNumber:
+		case LineRange:
+		default:
+			panic("Highlight block type not supported.")
+		}
+	}
+
+	return false
+}
+
+type ReverseCharRange []CharRange
+
+func (r ReverseCharRange) Len() int           { return len(r) }
+func (r ReverseCharRange) Less(i, j int) bool { return r[i].start > r[j].start }
+func (r ReverseCharRange) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
+
+// TODO: maybe we should put highlights into it's own file
+func (hl *Highlights) RenderSubrange(line string, lineNum int) string {
+	charRanges := []CharRange{}
+	for e := hl.highlightBlocks.Front(); e != nil; e = e.Next() {
+		switch v := e.Value.(type) {
+		case CharRange:
+			if v.Contains(lineNum) {
+				charRanges = append(charRanges, v)
+			}
+		case LineNumber:
+		case LineRange:
+		default:
+			panic("Highlight block type not supported.")
+		}
+	}
+
+	sort.Sort(ReverseCharRange(charRanges))
+
+	for _, charRange := range charRanges {
+		line = insertAt(line, charRange.end, "`")
+		line = insertAt(line, charRange.start-1, "`")
+	}
+
+	return line
 }
 
 // Prints all highlight blocks
@@ -196,6 +281,41 @@ func parseRevInsertCodeInfo(line string, codeRoot string) (insertCodeInfo, error
 	return insertCodeInfo{filename, lineRange}, err
 }
 
+func parseCharRanges(hlBlock string, highlights *Highlights, baseCodeRange *LineRange, handleLinesRelative bool) {
+	lineCharRange := strings.Split(hlBlock, ":")
+	lineNum, err := strconv.ParseInt(lineCharRange[0], 10, 32)
+	charRanges := lineCharRange[1]
+	if err != nil {
+		log.Fatal("Could not parse highlight line number", err)
+	}
+
+	if handleLinesRelative {
+		// -1 is relevant because line numbers start a 1 not 0
+		lineNum = int64(baseCodeRange.start) + lineNum - 1
+	}
+
+	charRanges = strings.TrimLeft(charRanges, "{")
+	charRanges = strings.TrimRight(charRanges, "}")
+
+	splitCharRanges := strings.Split(charRanges, "|")
+	for _, charRange := range splitCharRanges {
+		splitCharRange := strings.Split(charRange, "-")
+
+		charStart, err := strconv.ParseInt(splitCharRange[0], 10, 32)
+		if err != nil {
+			log.Fatal("Could not parse highlight char range start", err)
+		}
+
+		charEnd, err := strconv.ParseInt(splitCharRange[1], 10, 32)
+		if err != nil {
+			log.Fatal("Could not parse highlight char range end", err)
+		}
+
+		highlights.PushBack(CharRange{LineNumber{int(lineNum)}, int(charStart), int(charEnd)})
+	}
+}
+
+// Works for rev_insert_code and insert_code
 var highlightCodeRgx = regexp.MustCompile("insert_code\\(.*\\).*?(?P<rel>[r\\{]+)(?P<highlights>.*)\\}")
 
 func parseHighlights(line string, highlights *Highlights, baseCodeRange *LineRange) {
@@ -214,7 +334,9 @@ func parseHighlights(line string, highlights *Highlights, baseCodeRange *LineRan
 
 	blocks := strings.Split(matchResults["highlights"], ",")
 	for _, block := range blocks {
-		if strings.Contains(block, "-") {
+		if strings.Contains(block, ":") { // Got and inline hl block
+			parseCharRanges(block, highlights, baseCodeRange, handleLinesRelative)
+		} else if strings.Contains(block, "-") {
 			block_split := strings.Split(block, "-")
 			start, err := strconv.ParseInt(block_split[0], 10, 32)
 			if err != nil {
