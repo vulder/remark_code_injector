@@ -47,7 +47,7 @@ func TransformLine(line string, codeRoot string) string {
 }
 
 func wrapWithCodeBlock(text string, lang string) string {
-	return "```" + lang + "\n" + text + "\n```"
+	return "```" + lang + "\n" + text + "```"
 }
 
 //
