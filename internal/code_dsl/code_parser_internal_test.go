@@ -113,7 +113,7 @@ int main(/* int argc, char *argv[] */) {
 		t.Error("CodeBlock ends at the wrong line.")
 	}
 
-	renderedCode := cb.render(nil)
+	renderedCode := cb.render(nil, nil, "cpp")
 
 	if renderedCode != `T shaveTheYak(T t) {
   return t;
@@ -140,7 +140,7 @@ int main(/* int argc, char *argv[] */) {
 }
 `)
 
-	ci := parseInsertCode("insert_code("+codeFilePath+":1-4)", "")
+	ci, err := parseInsertCode("insert_code("+codeFilePath+":1-4)", "")
 
 	renderedCode := ci.renderCodeBlock()
 	t.Log(ci.renderCodeBlock())
@@ -149,7 +149,7 @@ int main(/* int argc, char *argv[] */) {
 T shaveTheYak(T t) {
   return t;
 }
-` {
+` || err != nil {
 		t.Log("renderedCode: ", renderedCode)
 		t.Error("Code was wrongly generated for `insert_code`.")
 	}
@@ -169,7 +169,7 @@ int main(/* int argc, char *argv[] */) {
 `)
 	dsl_string := "insert_code(" + codeFilePath + ":1-4){4,1-2}"
 
-	ci := parseInsertCode(dsl_string, "")
+	ci, err := parseInsertCode(dsl_string, "")
 	ci.highlights.Init()
 
 	parseHighlights(dsl_string, &ci.highlights, nil /*should not be needed*/)
@@ -180,7 +180,7 @@ int main(/* int argc, char *argv[] */) {
 *T shaveTheYak(T t) {
   return t;
 *}
-` {
+` || err != nil {
 		t.Log("renderedCode: ", renderedCode)
 		t.Error("Code was wrongly generated for `insert_code` with highlights.")
 	}
@@ -199,7 +199,7 @@ int main(/* int argc, char *argv[] */) {
 }
 `)
 	dsl_string := "insert_code(" + codeFilePath + ":1-4)r{2-3}"
-	ci := parseInsertCode(dsl_string, "")
+	ci, err := parseInsertCode(dsl_string, "")
 	ci.highlights.Init()
 
 	baseCodeRange := LineRange{1, 4}
@@ -211,7 +211,7 @@ int main(/* int argc, char *argv[] */) {
 *T shaveTheYak(T t) {
 * return t;
 }
-` {
+` || err != nil {
 		t.Log("renderedCode: ", renderedCode)
 		t.Error("Code was wrongly generated for `insert_code` with highlights.")
 	}
@@ -230,7 +230,7 @@ int main(/* int argc, char *argv[] */) {
 }
 `)
 	dsl_string := "insert_code(" + codeFilePath + ":1-4)r{1,2:{3-13|17-17},3}"
-	ci := parseInsertCode(dsl_string, "")
+	ci, err := parseInsertCode(dsl_string, "")
 	ci.highlights.Init()
 
 	baseCodeRange := LineRange{1, 4}
@@ -243,9 +243,78 @@ int main(/* int argc, char *argv[] */) {
 	expectedCode += "* return t;\n"
 	expectedCode += "}\n"
 
-	if renderedCode != expectedCode {
+	if renderedCode != expectedCode || err != nil {
 		t.Log("renderedCode: ", renderedCode, " expected: ", expectedCode)
 		t.Error("Highlights were wrongly generated for `insert_code`.")
+	}
+}
+
+func TestRenderDotReplacementsLines(t *testing.T) {
+	defer filet.CleanUp(t)
+	codeFilePath := filet.TmpDir(t, "") + "/foo.cpp"
+	filet.File(t, codeFilePath, `template <typename T>
+T shaveTheYak(T t) {
+  return t;
+}
+
+int main(int argc, char *argv[]) {
+  return shaveTheYak(42);
+}
+`)
+	dsl_string := "insert_code(" + codeFilePath + ":1-8)<d2-3,d7,d6:{9-31}>"
+
+	ci, err := parseInsertCode(dsl_string, "")
+	ci.highlights.Init()
+
+	parseHighlights(dsl_string, &ci.highlights, nil /*should not be needed*/)
+
+	renderedCode := ci.renderCodeBlock()
+
+	if renderedCode != `template <typename T>
+  // ...
+}
+
+int main(/* ... */) {
+  // ...
+}
+` || err != nil {
+		t.Log("renderedCode: ", renderedCode)
+		t.Error("Code was wrongly generated for `insert_code` with dot replacements.")
+	}
+}
+
+func TestRenderHideLines(t *testing.T) {
+	defer filet.CleanUp(t)
+	codeFilePath := filet.TmpDir(t, "") + "/foo.cpp"
+	filet.File(t, codeFilePath, `template <typename T>
+T shaveTheYak(T t) {
+  return t;
+}
+
+int main(int argc, char *argv[]) {
+  return shaveTheYak(42);
+}
+`)
+	dsl_string := "insert_code(" + codeFilePath + ":1-8)<h2-3,h7,h6:{9-31}>"
+
+	ci, err := parseInsertCode(dsl_string, "")
+	ci.highlights.Init()
+
+	parseHighlights(dsl_string, &ci.highlights, nil /*should not be needed*/)
+
+	renderedCode := ci.renderCodeBlock()
+
+	if renderedCode != `template <typename T>
+
+
+}
+
+int main(/**/) {
+
+}
+` || err != nil {
+		t.Log("renderedCode: ", renderedCode)
+		t.Error("Code was wrongly generated for `insert_code` with dot replacements.")
 	}
 }
 
@@ -330,6 +399,38 @@ int main(/* int argc, char *argv[] */) {
 
 	if err == nil {
 		t.Error("Code was wrongly generated for `insert_code`.")
+	}
+}
+
+func TestRenderDotReplacementsLinesRevInsert(t *testing.T) {
+	defer filet.CleanUp(t)
+	codeFilePath := filet.TmpDir(t, "") + "/bazz.cpp"
+	filet.File(t, codeFilePath, `// code_block(BazzID:1-8)
+template <typename T>
+T shaveTheYak(T t) {
+  return t;
+}
+
+int main(int argc, char *argv[]) {
+  return shaveTheYak(42);
+}
+`)
+	dsl_string := "rev_insert_code(" + codeFilePath + ":BazzID)r<d2-3,d7,d6:{9-31}>"
+
+	ci, err := parseRevInsertCode(dsl_string, "")
+
+	renderedCode := ci.renderCodeBlock()
+
+	if renderedCode != `template <typename T>
+  // ...
+}
+
+int main(/* ... */) {
+  // ...
+}
+` || err != nil {
+		t.Log("renderedCode: ", renderedCode)
+		t.Error("Code was wrongly generated for `rev_insert_code` with dot replacements.")
 	}
 }
 

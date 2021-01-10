@@ -4,7 +4,10 @@ package code_dsl
 // that is needed in a DSL command.
 func GetFileDependency(line string, codeRoot string) string {
 	if isInsertCode(line) {
-		return parserInsertCodeInfo(line).filename
+		ci, err := parserInsertCodeInfo(line)
+		if err == nil {
+			return ci.filename
+		}
 	}
 	if isRevInsertCode(line) {
 		ci, err := parseRevInsertCodeInfo(line, codeRoot)

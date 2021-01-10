@@ -13,7 +13,7 @@ import (
 // char_range       = { digit }, "|", { digit };
 // char_range_list  = char_range | [ { "," , char_range } ];
 // ln_range_list    = range | line_num, [ { "," , range | line_num } ];
-// vis_select       = "r", "<", ln_range_list , ">";
+// vis_select       = "r", "<", ["h" | "d"], ln_range_list , ">";
 // hl_select        = "r", "{" , ln_range_list , "}";
 //
 //===----------------------------------------------------------------------===//
@@ -63,7 +63,11 @@ func isInsertCode(line string) bool {
 }
 
 func handleInsertCode(line string, codeRoot string) string {
-	ci := parseInsertCode(line, codeRoot)
+	ci, err := parseInsertCode(line, codeRoot)
+	if err != nil { // In the error case we return the unprocessed line to not destroy the doc.
+		print("Could not process insert_code line: ", line)
+		return line
+	}
 
 	codeLanguageType := ci.progLang
 
