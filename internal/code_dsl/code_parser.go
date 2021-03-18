@@ -141,6 +141,7 @@ type VisualModificationType int
 const (
 	ReplaceWithDots VisualModificationType = iota
 	Hide                                   = iota
+	Remove                                 = iota
 )
 
 type VisualModification struct {
@@ -169,6 +170,8 @@ func (vm *VisualModifications) ModifyLine(line string, lineNum int, language str
 				placeHolder := ""
 				if vm.modeType == ReplaceWithDots {
 					placeHolder = " ... "
+				} else if vm.modeType == Hide {
+					placeHolder = ""
 				}
 				lineRunes := []rune(line)
 				if lrs.end > len(line) {
@@ -182,19 +185,23 @@ func (vm *VisualModifications) ModifyLine(line string, lineNum int, language str
 					return strings.Repeat(" ", getIndent(line)) + makeComment(" ...", language), true
 				} else if vm.modeType == Hide {
 					return "", true
+				} else if vm.modeType == Remove {
+					return "", false
 				} else {
 					panic("Unsupported visual modifier")
 				}
 			}
 		case LineRange:
 			if lrs.Contains(lineNum) {
-				if lrs.end != lineNum {
-					return "", !(vm.modeType == ReplaceWithDots)
-				}
 				if vm.modeType == ReplaceWithDots {
+					if lrs.end != lineNum {
+						return "", false
+					}
 					return strings.Repeat(" ", getIndent(line)) + makeComment(" ...", language), true
 				} else if vm.modeType == Hide {
 					return "", true
+				} else if vm.modeType == Remove {
+					return "", false
 				} else {
 					panic("Unsupported visual modifier")
 				}
@@ -512,7 +519,7 @@ func parseHighlights(line string, highlights *Highlights, baseCodeRange *LineRan
 }
 
 // Works for rev_insert_code and insert_code
-var visualCodeRgx = regexp.MustCompile("insert_code\\(.*\\).*?(?P<mod>[r\\<]+)(?P<visuals>.*)\\>")
+var visualCodeRgx = regexp.MustCompile("insert_code\\(.*\\).*?(?P<mod>[r]*\\<)(?P<visuals>.*)\\>")
 
 func parseVisuals(line string, visuals *VisualModifications, baseCodeRange *LineRange) {
 	match := visualCodeRgx.FindStringSubmatch(line)
@@ -532,20 +539,23 @@ func parseVisuals(line string, visuals *VisualModifications, baseCodeRange *Line
 	for _, block := range blocks {
 		replaceWithDots := strings.HasPrefix(block, "d")
 		hideLines := strings.HasPrefix(block, "h")
+		removeLines := strings.HasPrefix(block, "r")
 
-		if !replaceWithDots && !hideLines {
+		if !replaceWithDots && !hideLines && !removeLines {
 			log.Println("No visual modification type set, defaulting to hidding the lines.")
 			hideLines = true
 		}
 		getVisualModType := func() VisualModificationType {
 			if replaceWithDots {
 				return ReplaceWithDots
+			} else if removeLines {
+				return Remove
 			} else {
 				return Hide
 			}
 		}
 
-		block = strings.TrimLeft(block, "hd")
+		block = strings.TrimLeft(block, "hdr")
 
 		if strings.Contains(block, ":") { // Got and inline hl block
 			parseCharRangesVisuals(block, visuals, baseCodeRange, handleLinesRelative, getVisualModType())

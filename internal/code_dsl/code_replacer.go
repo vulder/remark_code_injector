@@ -13,7 +13,7 @@ import (
 // char_range       = { digit }, "|", { digit };
 // char_range_list  = char_range | [ { "," , char_range } ];
 // ln_range_list    = range | line_num, [ { "," , range | line_num } ];
-// vis_select       = "r", "<", ["h" | "d"], ln_range_list , ">";
+// vis_select       = "r", "<", ["h" | "d" | "r"], ln_range_list , ">";
 // hl_select        = "r", "{" , ln_range_list , "}";
 //
 //===----------------------------------------------------------------------===//
