@@ -488,6 +488,17 @@ func parseLineNumberVisuals(block string, visuals *VisualModifications, baseCode
 var highlightCodeRgx = regexp.MustCompile("insert_code\\(.*\\).*?(?P<rel>[r\\{]+)(?P<highlights>.*)\\}")
 
 func parseHighlights(line string, highlights *Highlights, baseCodeRange *LineRange) {
+	if strings.Contains(line, "<") { // Hide visual selection
+		startVis := 0
+		if strings.Contains(line, "r<") {
+			startVis = strings.Index(line, "r<")
+		} else {
+			startVis = strings.Index(line, "<")
+		}
+		endVis := strings.Index(line, ">")
+		line = line[:startVis] + line[endVis+1:]
+	}
+
 	match := highlightCodeRgx.FindStringSubmatch(line)
 	if match == nil { // Return when we did not find any highlights
 		return
@@ -497,11 +508,6 @@ func parseHighlights(line string, highlights *Highlights, baseCodeRange *LineRan
 		if i != 0 && name != "" {
 			matchResults[name] = match[i]
 		}
-	}
-
-	if strings.HasPrefix(matchResults["highlights"], "<") ||
-		strings.HasPrefix(matchResults["highlights"], "r<") { // Skip visual matches with sub range constructs
-		return
 	}
 
 	handleLinesRelative := matchResults["rel"] == "r{"

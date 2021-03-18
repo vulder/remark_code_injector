@@ -464,6 +464,38 @@ int main(/* ... */) {
 	}
 }
 
+func TestRenderDotReplacementsLinesAndHighlightRevInsert(t *testing.T) {
+	defer filet.CleanUp(t)
+	codeFilePath := filet.TmpDir(t, "") + "/bazz.cpp"
+	filet.File(t, codeFilePath, `// code_block(BazzID:1-9)
+template <typename T>
+T shaveTheYak(T t) {
+	t + 1;
+  return t;
+}
+
+int main(int argc, char *argv[]) {
+  return shaveTheYak(42);
+}
+`)
+	dsl_string := "rev_insert_code(" + codeFilePath + ":BazzID)r<r3-4,r8,d7:{9-31}>r{1-2,7}"
+
+	ci, err := parseRevInsertCode(dsl_string, "")
+
+	renderedCode := ci.renderCodeBlock()
+
+	if renderedCode != `*template <typename T>
+*T shaveTheYak(T t) {
+}
+
+*int main(/* ... */) {
+}
+` || err != nil {
+		t.Log("renderedCode: ", renderedCode)
+		t.Error("Code was wrongly generated for `rev_insert_code` with dot replacements.")
+	}
+}
+
 //===----------------------------------------------------------------------===//
 // Programming language tests
 
