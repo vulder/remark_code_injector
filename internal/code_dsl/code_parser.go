@@ -43,13 +43,31 @@ func (cr CharRange) Contains(lineNum int) bool {
 	return lineNum >= cr.lineNum.value && lineNum <= cr.lineNum.value
 }
 
+func adaptIndent(line string, indent int) string {
+	if indent == 0 {
+		return line
+	} else if indent > 0 {
+		return strings.Repeat(" ", indent) + line
+	} else {
+		initialLength := len(line)
+
+		trimmedLine := strings.Trim(line, " ")
+
+		reAddSpacesNSpaces := (initialLength + indent) - len(trimmedLine)
+		if reAddSpacesNSpaces > 0 {
+			trimmedLine = strings.Repeat(" ", reAddSpacesNSpaces) + trimmedLine
+		}
+		return trimmedLine
+	}
+}
+
 type CodeBlock struct {
 	fileRange LineRange
 	lines     list.List
 }
 
 // Render a CodeBlock as a string
-func (cb CodeBlock) render(highlights *Highlights, visuals *VisualModifications, language string) string {
+func (cb CodeBlock) render(highlights *Highlights, visuals *VisualModifications, language string, options CodeGenOptions) string {
 	strRepr := ""
 
 	lineNum := cb.fileRange.start
@@ -72,6 +90,17 @@ func (cb CodeBlock) render(highlights *Highlights, visuals *VisualModifications,
 				continue
 			}
 			line = vLine
+		}
+
+		if options.hideComments() {
+			lineWithoutWS := strings.Trim(line, " ")
+			if strings.HasPrefix(lineWithoutWS, "//") {
+				continue
+			}
+		}
+
+		if options.getIndent() != 0 {
+			line = adaptIndent(line, options.getIndent())
 		}
 
 		strRepr += line + "\n"
@@ -273,10 +302,11 @@ type CodeInsertion struct {
 	progLang   string
 	visuals    VisualModifications
 	highlights Highlights
+	options    CodeGenOptions
 }
 
 func (ci CodeInsertion) renderCodeBlock() string {
-	return ci.codeBlock.render(&ci.highlights, &ci.visuals, ci.progLang)
+	return ci.codeBlock.render(&ci.highlights, &ci.visuals, ci.progLang, ci.options)
 }
 
 type insertCodeInfo struct {
@@ -573,6 +603,23 @@ func parseVisuals(line string, visuals *VisualModifications, baseCodeRange *Line
 	}
 }
 
+var optionsRegex = regexp.MustCompile("insert_code\\(.*\\).*?\\[(?P<Options>.*)\\]")
+
+func consumeOptionsString(line string) (string, string) {
+	match := optionsRegex.FindStringSubmatch(line)
+	if match == nil { // Return when we did not find any visuals
+		return "", line
+	}
+	matchResults := make(map[string]string)
+	for i, name := range optionsRegex.SubexpNames() {
+		if i != 0 && name != "" {
+			matchResults[name] = match[i]
+		}
+	}
+
+	return matchResults["Options"], line
+}
+
 func parseInsertCode(line string, codeRoot string) (CodeInsertion, error) {
 	icInfo, err := parserInsertCodeInfo(line)
 	if err != nil {
@@ -584,6 +631,11 @@ func parseInsertCode(line string, codeRoot string) (CodeInsertion, error) {
 	ci.progLang = getProgrammingLanguage(icInfo.filename)
 	ci.visuals.Init()
 	ci.highlights.Init()
+
+	optionsStr := ""
+	optionsStr, line = consumeOptionsString(line)
+	ci.options = ParseCodeGenOptions(optionsStr)
+
 	parseHighlights(line, &ci.highlights, &icInfo.filerange)
 	parseVisuals(line, &ci.visuals, &icInfo.filerange)
 	return ci, nil
@@ -600,6 +652,11 @@ func parseRevInsertCode(line string, codeRoot string) (CodeInsertion, error) {
 	ci.progLang = getProgrammingLanguage(icInfo.filename)
 	ci.visuals.Init()
 	ci.highlights.Init()
+
+	optionsStr := ""
+	optionsStr, line = consumeOptionsString(line)
+	ci.options = ParseCodeGenOptions(optionsStr)
+
 	parseHighlights(line, &ci.highlights, &icInfo.filerange)
 	parseVisuals(line, &ci.visuals, &icInfo.filerange)
 	return ci, err

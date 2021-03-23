@@ -15,11 +15,17 @@ import (
 // ln_range_list    = range | line_num, [ { "," , range | line_num } ];
 // vis_select       = "r", "<", ["h" | "d" | "r"], ln_range_list , ">";
 // hl_select        = "r", "{" , ln_range_list , "}";
+// option           = "key=value"
+// options          = "[", option * ,"]"
 //
 //===----------------------------------------------------------------------===//
 // Commands:
-//  * "insert_code(filename:" , range | line_num , ")" , vis_select , hl_select
-//  * "rev_insert_code(filename:BlockID)" , vis_select , hl_select
+//  * "insert_code(filename:" , range | line_num , ")" , vis_select , hl_select, options
+//  * "rev_insert_code(filename:BlockID)" , vis_select , hl_select, options
+//===----------------------------------------------------------------------===//
+// Options:
+//  * indent: +/- level of spaces that should be added/removed for indenting
+//  * comments: include comments (default: true)
 //===----------------------------------------------------------------------===//
 
 // Checks if the line contains an code DSL command.

@@ -39,6 +39,58 @@ func TestInsertAtEnd(t *testing.T) {
 	}
 }
 
+func TestAdaptIndentZero(t *testing.T) {
+	baseString := "  FooBar"
+	expectedString := "  FooBar"
+	trimValue := 0
+
+	trimmedString := adaptIndent(baseString, trimValue)
+
+	if trimmedString != expectedString {
+		t.Log("trimmedString:", "'"+trimmedString+"'", " but expected ", "'"+expectedString+"'")
+		t.Error("Line indent was not correctly adapted.")
+	}
+}
+
+func TestAdaptIndentAddLessThanPresent(t *testing.T) {
+	baseString := "  FooBar"
+	expectedString := "      FooBar"
+	trimValue := 4
+
+	trimmedString := adaptIndent(baseString, trimValue)
+
+	if trimmedString != expectedString {
+		t.Log("trimmedString:", "'"+trimmedString+"'", " but expected ", "'"+expectedString+"'")
+		t.Error("Line indent was not correctly adapted.")
+	}
+}
+
+func TestAdaptIndentMoreThanPresent(t *testing.T) {
+	baseString := "  FooBar"
+	expectedString := "FooBar"
+	trimValue := -4
+
+	trimmedString := adaptIndent(baseString, trimValue)
+
+	if trimmedString != expectedString {
+		t.Log("trimmedString:", "'"+trimmedString+"'", " but expected ", "'"+expectedString+"'")
+		t.Error("Line indent was not correctly adapted.")
+	}
+}
+
+func TestAdaptIndentRemoveLessThanPresent(t *testing.T) {
+	baseString := "      FooBar"
+	expectedString := "  FooBar"
+	trimValue := -4
+
+	trimmedString := adaptIndent(baseString, trimValue)
+
+	if trimmedString != expectedString {
+		t.Log("trimmedString:", "'"+trimmedString+"'", " but expected ", "'"+expectedString+"'")
+		t.Error("Line indent was not correctly adapted.")
+	}
+}
+
 //===----------------------------------------------------------------------===//
 // Highlights
 
@@ -113,7 +165,7 @@ int main(/* int argc, char *argv[] */) {
 		t.Error("CodeBlock ends at the wrong line.")
 	}
 
-	renderedCode := cb.render(nil, nil, "cpp")
+	renderedCode := cb.render(nil, nil, "cpp", MakeDefaultCodeGenOptions())
 
 	if renderedCode != `T shaveTheYak(T t) {
   return t;
@@ -318,6 +370,109 @@ int main(/**/) {
 	}
 }
 
+func TestRenderWithPosIndent(t *testing.T) {
+	defer filet.CleanUp(t)
+	codeFilePath := filet.TmpDir(t, "") + "/foo.cpp"
+	filet.File(t, codeFilePath, `template <typename T>
+T shaveTheYak(T t) {
+  return t;
+}
+`)
+
+	dsl_string := "insert_code(" + codeFilePath + ":1-4)[indent=2]"
+
+	ci, err := parseInsertCode(dsl_string, "")
+	ci.highlights.Init()
+
+	optionsStr := ""
+	optionsStr, dsl_string = consumeOptionsString(dsl_string)
+	ci.options = ParseCodeGenOptions(optionsStr)
+
+	parseHighlights(dsl_string, &ci.highlights, nil /*should not be needed*/)
+
+	renderedCode := ci.renderCodeBlock()
+
+	expectedCode := `  template <typename T>
+  T shaveTheYak(T t) {
+    return t;
+  }
+`
+
+	if renderedCode != expectedCode || err != nil {
+		t.Logf("renderedCode:\n%sbut expected\n%s", renderedCode, expectedCode)
+		t.Error("Code was wrongly generated for `insert_code` with dot replacements.")
+	}
+}
+
+func TestRenderWithNegIndent(t *testing.T) {
+	defer filet.CleanUp(t)
+	codeFilePath := filet.TmpDir(t, "") + "/foo.cpp"
+	filet.File(t, codeFilePath, `template <typename T>
+T shaveTheYak(T t) {
+  return t;
+}
+`)
+
+	dsl_string := "insert_code(" + codeFilePath + ":1-4)[indent=-2]"
+
+	ci, err := parseInsertCode(dsl_string, "")
+	ci.highlights.Init()
+
+	optionsStr := ""
+	optionsStr, dsl_string = consumeOptionsString(dsl_string)
+	ci.options = ParseCodeGenOptions(optionsStr)
+
+	parseHighlights(dsl_string, &ci.highlights, nil /*should not be needed*/)
+
+	renderedCode := ci.renderCodeBlock()
+
+	expectedCode := `template <typename T>
+T shaveTheYak(T t) {
+return t;
+}
+`
+
+	if renderedCode != expectedCode || err != nil {
+		t.Logf("renderedCode:\n%sbut expected\n%s", renderedCode, expectedCode)
+		t.Error("Code was wrongly generated for `insert_code` with dot replacements.")
+	}
+}
+
+func TestRenderWithCommentThatShouldBeRemoved(t *testing.T) {
+	defer filet.CleanUp(t)
+	codeFilePath := filet.TmpDir(t, "") + "/foo.cpp"
+	filet.File(t, codeFilePath, `template <typename T>
+T shaveTheYak(T t) {
+  // this is a comment
+  return t;
+}
+`)
+
+	dsl_string := "insert_code(" + codeFilePath + ":1-5)[comments=false]"
+
+	ci, err := parseInsertCode(dsl_string, "")
+	ci.highlights.Init()
+
+	optionsStr := ""
+	optionsStr, dsl_string = consumeOptionsString(dsl_string)
+	ci.options = ParseCodeGenOptions(optionsStr)
+
+	parseHighlights(dsl_string, &ci.highlights, nil /*should not be needed*/)
+
+	renderedCode := ci.renderCodeBlock()
+
+	expectedCode := `template <typename T>
+T shaveTheYak(T t) {
+  return t;
+}
+`
+
+	if renderedCode != expectedCode || err != nil {
+		t.Logf("renderedCode:\n%sbut expected\n%s", renderedCode, expectedCode)
+		t.Error("Code was wrongly generated for `insert_code` with dot replacements.")
+	}
+}
+
 //===----------------------------------------------------------------------===//
 // rev_insert_code
 
@@ -493,6 +648,41 @@ int main(int argc, char *argv[]) {
 ` || err != nil {
 		t.Log("renderedCode: ", renderedCode)
 		t.Error("Code was wrongly generated for `rev_insert_code` with dot replacements.")
+	}
+}
+
+func TestRevInsertRenderWithCommentThatShouldBeRemoved(t *testing.T) {
+	defer filet.CleanUp(t)
+	codeFilePath := filet.TmpDir(t, "") + "/bazz.cpp"
+	filet.File(t, codeFilePath, `// code_block(BazzID:1-9)
+template <typename T>
+T shaveTheYak(T t) {
+  // comment
+  return t;
+}
+`)
+	dsl_string := "rev_insert_code(" + codeFilePath + ":BazzID)[comments=false]"
+
+	ci, err := parseRevInsertCode(dsl_string, "")
+	ci.highlights.Init()
+
+	optionsStr := ""
+	optionsStr, dsl_string = consumeOptionsString(dsl_string)
+	ci.options = ParseCodeGenOptions(optionsStr)
+
+	parseHighlights(dsl_string, &ci.highlights, nil /*should not be needed*/)
+
+	renderedCode := ci.renderCodeBlock()
+
+	expectedCode := `template <typename T>
+T shaveTheYak(T t) {
+  return t;
+}
+`
+
+	if renderedCode != expectedCode || err != nil {
+		t.Logf("renderedCode:\n%sbut expected\n%s", renderedCode, expectedCode)
+		t.Error("Code was wrongly generated for `insert_code` with dot replacements.")
 	}
 }
 
