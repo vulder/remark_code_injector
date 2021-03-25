@@ -35,7 +35,6 @@ func ParseCodeGenOptions(optionString string) CodeGenOptions {
 			continue
 		}
 
-		fmt.Println("Got:", optionStr)
 		kvPair := strings.Split(optionStr, "=")
 		optionKey := strings.ToLower(kvPair[0])
 		optionValue := kvPair[1]
